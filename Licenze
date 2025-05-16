@@ -1,1 +1,94 @@
+/* LICENZE IN SCADENZA */
+SELECT 
+a.an_descr1 as NomeAzienda, 
+ar.ar_codart as CodiceArticolo, 
+ar.ar_descr as Descrizione,
+CASE 
+	WHEN ar.ar_codmarc = 261 THEN 'WILDIX'
+    WHEN ar.ar_codart LIKE 'ACR%' THEN 'ACRONIS'
+    WHEN ar.ar_descr LIKE 'FORT%' THEN 'FORTINET'
+    WHEN ar.ar_descr LIKE 'SYN%' THEN 'SYNOLOGY'
+    WHEN ar.ar_descr LIKE 'QN%' THEN 'QNAP'
+    WHEN ar.ar_descr LIKE 'YEAS%' THEN 'YEASTAR'
+    WHEN ar.ar_descr LIKE 'ESE%' THEN 'ESET'
+    ELSE 'AltraLicenza'
+END AS CategoriaArticolo,
+cast(m.mm_datini as Date) as DataInizio,
+cast(m.mm_datfin as Date) as DataFine,
+Case when t.tm_tipork='N'
+	Then m.mm_valore*-1 -- toglie le imposte (netto)
+	else m.mm_valore 
+end as Fatturato,
+DATEDIFF(DAY, m.mm_datini, m.mm_datfin) AS DurataContratto,
+CASE 
+    WHEN GETDATE() BETWEEN m.mm_datini AND m.mm_datfin -- mi permette di prendere solo le date comprese tra inizio e fine
+      THEN DATEDIFF(DAY, GETDATE(), m.mm_datfin)
+    ELSE NULL
+  END AS GiorniRimanenti 
+from testmag t LEFT JOIN movmag m on 
+t.codditt = m.codditt and
+t.tm_tipork = m.mm_tipork and
+t.tm_anno = m.mm_anno and
+t.tm_serie = m.mm_serie and
+t.tm_numdoc = m.mm_numdoc
+LEFT join anagra a ON
+t.codditt = a.codditt and
+t.tm_conto = a.an_conto
+LEFT JOIN  artico ar ON
+m.mm_codart = ar.ar_codart and
+m.codditt = ar.codditt
+WHERE
+t.tm_anno >= 2021 AND
+a.an_tipo = 'C' and
+DATEDIFF(DAY, GETDATE(), m.mm_datfin) BETWEEN 0 AND 40 AND
+GETDATE() >= m.mm_datini AND -- deve esse maggiore = rispetto alla data inizio
+DATEDIFF(DAY, m.mm_datini, m.mm_datfin) NOT IN (0, 2) AND -- mi esclude qui prodotti fisici che hanno la data fine dopo due giorni dalla data di inizio
+(t.tm_tipork = 'A' or (t.tm_tipork='B' and t.tm_flfatt='S'))
 
+
+/* LICENZE VENDUTE */
+SELECT 
+a.an_descr1 as NomeAzienda, 
+ar.ar_codart as CodiceArticolo, 
+ar.ar_descr as Descrizione,
+CASE 
+	WHEN ar.ar_codmarc = 261 THEN 'WILDIX'
+    WHEN ar.ar_codart LIKE 'ACR%' THEN 'ACRONIS'
+    WHEN ar.ar_descr LIKE 'FORT%' THEN 'FORTINET'
+    WHEN ar.ar_descr LIKE 'SYN%' THEN 'SYNOLOGY'
+    WHEN ar.ar_descr LIKE 'QN%' THEN 'QNAP'
+    WHEN ar.ar_descr LIKE 'YEAS%' THEN 'YEASTAR'
+    WHEN ar.ar_descr LIKE 'ESE%' THEN 'ESET'
+    ELSE 'Altro'
+END AS CategoriaArticolo, 
+m.mm_datini as DataInizio,
+m.mm_datfin as DataFine,
+Case when t.tm_tipork='N'
+	Then m.mm_valore*-1 -- toglie le imposte (netto)
+	else m.mm_valore 
+end as Fatturato  
+from testmag t LEFT JOIN movmag m on 
+t.codditt = m.codditt and
+t.tm_tipork = m.mm_tipork and
+t.tm_anno = m.mm_anno and
+t.tm_serie = m.mm_serie and
+t.tm_numdoc = m.mm_numdoc
+LEFT join anagra a ON
+t.codditt = a.codditt and
+t.tm_conto = a.an_conto
+LEFT JOIN  artico ar ON
+m.mm_codart = ar.ar_codart and
+m.codditt = ar.codditt
+WHERE
+t.tm_anno >= 2020 AND
+a.an_tipo = 'C' and
+(ar.ar_codmarc = 261 or
+ar.ar_codart LIKE 'ACR%' or
+ar.ar_descr LIKE 'FORT%' or
+ar.ar_descr LIKE 'SYN%'or
+ar.ar_descr LIKE 'QN%' or
+ar.ar_descr LIKE 'YEAS%' or
+ar.ar_descr LIKE 'ESE%') AND
+(t.tm_tipork in ('A','N') or (t.tm_tipork='b' and t.tm_flfatt='s')) AND
+m.mm_datini <> m.mm_datfin AND
+DATEDIFF(DAY,m.mm_datini,m.mm_datfin) NOT IN (0,2)
