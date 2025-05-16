@@ -1,1 +1,29 @@
-
+/* VENDITA DI UN SERVICE PACK */
+SELECT 
+a.an_descr1 as NomeAzienda, 
+ar.ar_codart as CodiceArticolo, 
+ar.ar_descr as Descrizione,
+cast(t.tm_datdoc as date) as DataDocumento,
+Case when t.tm_tipork='N'
+	Then m.mm_valore*-1 -- toglie le imposte (netto)
+	else m.mm_valore 
+end as Fatturato
+from testmag t LEFT JOIN movmag m on 
+t.codditt = m.codditt and
+t.tm_tipork = m.mm_tipork and
+t.tm_anno = m.mm_anno and
+t.tm_serie = m.mm_serie and
+t.tm_numdoc = m.mm_numdoc
+LEFT join anagra a ON
+t.codditt = a.codditt and
+t.tm_conto = a.an_conto
+LEFT JOIN  artico ar ON
+m.mm_codart = ar.ar_codart and
+m.codditt = ar.codditt
+WHERE
+t.tm_anno >= 2021 AND
+a.an_tipo = 'C' and
+ar.ar_codart LIKE 'SP%' AND
+ar.ar_gruppo = 17 AND
+ar.ar_sotgru = 1703 AND
+(t.tm_tipork in ('A','N') or (t.tm_tipork='b' and t.tm_flfatt='s'))
