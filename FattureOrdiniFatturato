@@ -1,1 +1,70 @@
+/*VENDITE FATTE NELLA GIORNATA DI OGGI */
+select
+TM_CONTO as ContoCliente,
+an.an_descr1 as Cliente,
+an.an_citta as Citta,
+m.mm_codart as CodiceArticolo,
+case 
+	when m.mm_codart = 'D' then m.mm_descr
+	else ar.ar_descr
+end as Descrizione,
 
+(case when t.tm_tipork<>'B'
+	Then CAST(t.tm_datdoc As Date) 
+	Else cast(t.tm_datfat As Date)
+End) as Data,
+
+Case when t.tm_tipork='N'
+	Then m.mm_valore*-1 -- toglie le imposte (netto)
+	else m.mm_valore 
+end as Fatturato 
+from testmag t
+LEFT JOIN movmag m on
+t.codditt = m.codditt and
+t.tm_tipork = m.mm_tipork AND
+t.tm_anno = m.mm_anno AND
+t.tm_serie = m.mm_serie and
+t.tm_numdoc = m.mm_numdoc
+LEFT JOIN anagra an ON
+t.codditt = an.codditt AND
+t.tm_conto = an.an_conto
+LEFT JOIN artico ar ON
+m.codditt = ar.codditt AND
+m.mm_codart = ar.ar_codart
+WHERE
+(t.tm_tipork in ('A') OR (t.tm_tipork='B' AND tm_flfatt='S')) AND
+(case when t.tm_tipork<>'B'
+	Then CAST(t.tm_datdoc As Date) 
+	Else cast(t.tm_datfat As Date)
+End) = CAST(GETDATE() as Date) and
+an.an_tipo = 'C' and
+m.mm_descr not like '...%'
+
+
+/* FATTURE EMESSE NELLA GIORNATA DI OGGI */
+select
+CAST(t.tm_datdoc as date) as DataDoc,
+a.an_descr1 as Cliente,
+Case when t.tm_tipork='N'
+	Then t.tm_totmerce*-1 -- toglie le imposte (netto)
+	else t.tm_totmerce
+end as Fatturato,
+Case
+	when t.tm_tipork='A' then 'FattImmediata'
+	when t.tm_tipork='D' then 'FattDifferita'
+	when t.tm_tipork='N' then 'Nota Credito'
+End as Tipo,
+
+t.tm_anno as Anno,
+t.tm_serie as  Serie,
+t.tm_numdoc as NumeroDocumento
+from testmag t 
+LEFT JOIN anagra a ON
+t.codditt = a.codditt AND
+t.tm_conto = a.an_conto
+WHERE 
+CAST(t.tm_datdoc As Date) = CAST(GETDATE() as Date) and
+t.tm_tipork in('A','D','N' ) and
+a.an_tipo = 'C'
+group by
+t.tm_datdoc, a.an_descr1,t.tm_anno,t.tm_serie,t.tm_numdoc, t.tm_tipork,t.tm_totmerce
