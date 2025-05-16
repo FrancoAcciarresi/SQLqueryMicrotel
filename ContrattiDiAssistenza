@@ -1,1 +1,68 @@
+/* AZIENDE CHE HANNO ACQUISTO UN CONTRATTO */
+select 
+a.an_descr1 as NomeAzienda, 
+m.mm_codart as Contratto,
+m.mm_descr as Descrizione,
+Case when t.tm_tipork='N'
+	Then m.mm_valore*-1 -- toglie le imposte (netto)
+	else m.mm_valore 
+end as Fatturato, 
+m.mm_datini as DataInizio,
+m.mm_datfin as DataFine
+from testmag t 
+LEFT join anagra a on 
+t.codditt=a.codditt AND
+t.tm_conto = a.an_conto
+LEFT JOIN movmag m ON
+t.codditt = m.codditt and
+t.tm_tipork = m.mm_tipork AND
+t.tm_anno = m.mm_anno AND
+t.tm_serie = m.mm_serie and
+t.tm_numdoc = m.mm_numdoc
+where 
+m.mm_anno >=2020 and
+m.mm_codart in ('HD','HDFM', 'HDSG') AND
+(t.tm_tipork in ('A','N') or (t.tm_tipork='b' and t.tm_flfatt='s'))
+ORDER BY
+m.mm_datini, m.mm_datfin ASC;
 
+/* SCADENZA DEI CONTRATTI */
+select
+a.an_conto, 
+a.an_descr1 as NomeAzienda,
+CASE 
+    WHEN a.an_descr1 LIKE 'BNP%' THEN t.tm_riferim -- riferimento è nella fattura
+    ELSE NULL
+END AS RiferimentoBNP,
+m.mm_codart as Contratto,
+m.mm_descr as Descrizione,
+Case when t.tm_tipork='N'
+	Then m.mm_valore*-1 -- toglie le imposte (netto)
+	else m.mm_valore 
+end as Fatturato, 
+cast(m.mm_datini as DATE) as DataInizio,
+cast(m.mm_datfin as DATE) as DataFine,
+cast(t.tm_datdoc as DATE) as DataFattura,
+CASE 
+    WHEN GETDATE() BETWEEN m.mm_datini AND m.mm_datfin -- mi permette di prendere solo le date comprese tra inizio e fine
+      THEN DATEDIFF(DAY, GETDATE(), m.mm_datfin)
+    ELSE NULL
+  END AS GiorniRimanenti,
+t.tm_numdoc as NumeroFattura
+from testmag t 
+LEFT join anagra a on 
+t.codditt=a.codditt AND
+t.tm_conto = a.an_conto
+LEFT JOIN movmag m ON
+t.codditt = m.codditt and
+t.tm_tipork = m.mm_tipork AND
+t.tm_anno = m.mm_anno AND
+t.tm_serie = m.mm_serie and
+t.tm_numdoc = m.mm_numdoc
+where 
+m.mm_anno >=2020 and
+m.mm_codart in ('HD','HDFM', 'HDSG') AND
+DATEDIFF(DAY, GETDATE(), m.mm_datfin) BETWEEN 0 AND 40 AND
+GETDATE() >= m.mm_datini -- deve esse maggiore = rispetto alla data inizio
+ORDER BY -- sulla vista non è ordinato
+m.mm_datini, m.mm_datfin ASC;
