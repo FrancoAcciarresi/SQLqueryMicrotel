@@ -68,3 +68,133 @@ t.tm_tipork in('A','D','N' ) and
 a.an_tipo = 'C'
 group by
 t.tm_datdoc, a.an_descr1,t.tm_anno,t.tm_serie,t.tm_numdoc, t.tm_tipork,t.tm_totmerce
+
+
+/* FATTURATO TOTALE PER AZIENDA, PER ANNO, PER CATEGORIA */
+SELECT 
+an.an_descr1 as Cliente,
+t.tm_anno as Anno,
+SUM(CASE 
+        WHEN m.mm_codart IN ('HD', 'HDFM', 'HDSG') -- somma i valori dei solo contratti
+        THEN 
+          CASE 
+            WHEN t.tm_tipork = 'N' THEN m.mm_valore * -1 
+            ELSE m.mm_valore 
+          END
+        ELSE 0 
+      END) AS TotaleContratti,
+STUFF(( -- pezzo che mi serve per capire quali contratti sono stati acquistati
+    SELECT DISTINCT ', ' + m2.mm_codart
+    FROM movmag m2
+    INNER JOIN testmag t2
+      ON m2.codditt = t2.codditt
+      AND m2.mm_anno = t2.tm_anno
+      AND m2.mm_serie = t2.tm_serie
+      AND m2.mm_numdoc = t2.tm_numdoc
+      AND m2.mm_tipork = t2.tm_tipork
+    WHERE m2.mm_codart IN ('HD', 'HDFM', 'HDSG')
+      AND t2.tm_conto = t.tm_conto
+      AND t2.tm_anno = t.tm_anno
+    FOR XML PATH(''), TYPE
+  ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS ContrattiAcquistati,
+  sum(case
+		when ar.ar_codart LIKE 'SP%' AND
+		ar.ar_gruppo = 17 AND
+		ar.ar_sotgru = 1703
+		THEN 
+          CASE 
+            WHEN t.tm_tipork = 'N' THEN m.mm_valore * -1 
+            ELSE m.mm_valore 
+          END
+        ELSE 0 
+  end)as TotaleSP,
+  STUFF((
+    SELECT DISTINCT ', ' + m2.mm_codart
+    FROM movmag m2
+    INNER JOIN artico ar2 ON m2.codditt = ar2.codditt AND m2.mm_codart = ar2.ar_codart
+    INNER JOIN testmag t2 ON 
+        m2.codditt = t2.codditt AND
+        m2.mm_anno = t2.tm_anno AND
+        m2.mm_serie = t2.tm_serie AND
+        m2.mm_numdoc = t2.tm_numdoc AND
+        m2.mm_tipork = t2.tm_tipork
+    WHERE 
+        ar2.ar_codart LIKE 'SP%' 
+        AND ar2.ar_gruppo = 17 
+        AND ar2.ar_sotgru = 1703
+        AND t2.tm_conto = t.tm_conto
+        AND t2.tm_anno = t.tm_anno
+    FOR XML PATH(''), TYPE
+).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS SP_Acquistati,
+
+  SUM(CASE 
+        WHEN m.mm_codart NOT IN ('HD', 'HDFM', 'HDSG') -- somma di tutto quello che non è contratti o licence
+		and
+		not (ar.ar_codart LIKE 'SP%' AND
+		ar.ar_gruppo = 17 AND
+		ar.ar_sotgru = 1703
+		)
+		THEN 
+          CASE 
+            WHEN t.tm_tipork = 'N' THEN m.mm_valore * -1 
+            ELSE m.mm_valore 
+          END
+        ELSE 0 
+      END) AS TotaleAltro,
+	(
+	sum(CASE 
+        WHEN m.mm_codart IN ('HD', 'HDFM', 'HDSG') -- somma i valori dei solo contratti
+        THEN 
+          CASE 
+            WHEN t.tm_tipork = 'N' THEN m.mm_valore * -1 
+            ELSE m.mm_valore 
+          END
+        ELSE 0 
+      END)
+	  +
+	  sum(case
+		when ar.ar_codart LIKE 'SP%' AND
+		ar.ar_gruppo = 17 AND
+		ar.ar_sotgru = 1703
+		THEN 
+          CASE 
+            WHEN t.tm_tipork = 'N' THEN m.mm_valore * -1 
+            ELSE m.mm_valore 
+          END
+        ELSE 0 
+  end)
+  +
+  sum(CASE 
+        WHEN m.mm_codart NOT IN ('HD', 'HDFM', 'HDSG') -- somma di tutto quello che non è contratti o licence
+		and
+		not (ar.ar_codart LIKE 'SP%' AND
+		ar.ar_gruppo = 17 AND
+		ar.ar_sotgru = 1703
+		)
+		THEN 
+          CASE 
+            WHEN t.tm_tipork = 'N' THEN m.mm_valore * -1 
+            ELSE m.mm_valore 
+          END
+        ELSE 0 
+      END)
+) as TotGenerale
+from testmag t
+LEFT JOIN movmag m ON
+t.codditt = m.codditt AND
+t.tm_anno = m.mm_anno and
+t.tm_serie = m.mm_serie AND
+t.tm_numdoc = m.mm_numdoc AND
+t.tm_tipork = m.mm_tipork
+LEFT JOIN anagra an ON
+t.codditt = an.codditt and
+t.tm_conto = an.an_conto
+LEFT JOIN artico ar ON
+m.codditt = ar.codditt AND
+m.mm_codart = ar.ar_codart
+WHERE
+t.tm_anno >=2021 and
+an.an_tipo = 'C' and
+(t.tm_tipork = 'A' or (t.tm_tipork='B' and t.tm_flfatt='S'))
+GROUP BY an.an_descr1,t.tm_anno, t.tm_conto
+ORDER BY t.tm_anno ASC
